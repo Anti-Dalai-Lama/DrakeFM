@@ -12,19 +12,29 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.media.MediaPlayer;
+import android.os.Handler;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.view.GestureDetectorCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.GestureDetector;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.PopupWindow;
+import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -33,16 +43,21 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
+import java.util.zip.Inflater;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements GestureDetector.OnGestureListener, GestureDetector.OnDoubleTapListener{
 
     ListView musicListView;
     SeekBar musicProgress;
     ImageView playQueue;
-    ImageView playPause;
-    ImageView previousTrack;
-    ImageView nextTrack;
+    //ImageView playPause;
+    //ImageView previousTrack;
+    //ImageView nextTrack;
     TextView currentSong;
+    RelativeLayout relativeLayout;
+
+    private GestureDetectorCompat gestureDetector;
 
 
     final static int PERMISSION_REQUEST_CODE = 555;
@@ -69,15 +84,22 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        //setContentView(R.layout.activity_main);
+        setContentView(R.layout.touchable);
 
         musicListView = (ListView) findViewById(R.id.musicListView);
+
+
         musicProgress = (SeekBar) findViewById(R.id.musicProgress);
         playQueue = (ImageView) findViewById(R.id.playQueue);
-        playPause = (ImageView) findViewById(R.id.playPause);
-        previousTrack = (ImageView) findViewById(R.id.previousTrack);
-        nextTrack = (ImageView) findViewById(R.id.nextTrack);
+//        playPause = (ImageView) findViewById(R.id.playPause);
+//        previousTrack = (ImageView) findViewById(R.id.previousTrack);
+//        nextTrack = (ImageView) findViewById(R.id.nextTrack);
         currentSong = (TextView) findViewById(R.id.currentSong);
+        relativeLayout = (RelativeLayout) findViewById(R.id.activity_main);
+
+        gestureDetector = new GestureDetectorCompat(this,this);
+        gestureDetector.setOnDoubleTapListener(this);
 
         songsAdapter = new SongAdapter(this, songs);
         musicListView.setAdapter(songsAdapter);
@@ -88,7 +110,7 @@ public class MainActivity extends AppCompatActivity {
         if(MusicService.mediaPlayer != null){
             if(MusicService.mediaPlayer.isPlaying()){
                 playing = 1;
-                playPause.setImageResource(R.drawable.ic_pause_black_24dp);
+                //playPause.setImageResource(R.drawable.ic_pause_black_24dp);
                 musicProgress.setProgress(MusicService.mediaPlayer.getCurrentPosition());
                 musicProgress.setMax(MusicService.mediaPlayer.getDuration());
             }
@@ -113,7 +135,7 @@ public class MainActivity extends AppCompatActivity {
                 showSongTitle(position);
                 keepplaying = true;
                 MusicService.mPlayPosition = position;
-                PlayPause(playPause);
+                PlayPause();
             }
         });
 
@@ -149,9 +171,6 @@ public class MainActivity extends AppCompatActivity {
                             MusicService.mPlayPosition += 1;
                             keepplaying = true;
                         }
-                        //else
-                            //PlayPause(playPause);
-//                            MusicService.mPlayPosition = 0;
                         break;
                     case 2:
                         if(MusicService.mPlayPosition != songsAdapter.getCount() - 1)
@@ -165,7 +184,7 @@ public class MainActivity extends AppCompatActivity {
                         keepplaying = true;
                         break;
                 }
-                PlayPause(playPause);
+                PlayPause();
                 musicProgress.setProgress(0);
                 showSongTitle(MusicService.mPlayPosition);
             }
@@ -184,7 +203,8 @@ public class MainActivity extends AppCompatActivity {
         musicProgress.setProgress(seekProgress);
     }
 
-    public void ChangePlayQueue(View view){
+    //public void ChangePlayQueue(View view){
+    public void ChangePlayQueue(){
         switch (MusicService.queue){
             case 1:
                 MusicService.queue = 2;
@@ -201,7 +221,25 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void PlayPause(View view){
+    public void ChangePlayQueueReverse(){
+        switch (MusicService.queue){
+            case 1:
+                MusicService.queue = 3;
+                playQueue.setImageResource(R.drawable.ic_shuffle_black_24dp);
+                break;
+            case 2:
+                MusicService.queue = 1;
+                playQueue.setImageResource(R.drawable.ic_trending_flat_black_24dp);
+                break;
+            case 3:
+                MusicService.queue = 2;
+                playQueue.setImageResource(R.drawable.ic_loop_black_24dp);
+                break;
+        }
+    }
+
+    //public void PlayPause(View view)
+    public void PlayPause(){
         Intent serviceIntent = new Intent(this, MusicService.class);
         if(keepplaying && playing == 1)
             playing = 0;
@@ -209,7 +247,7 @@ public class MainActivity extends AppCompatActivity {
         switch (playing){
             case 0:
                 playing = 1;
-                playPause.setImageResource(R.drawable.ic_pause_black_24dp);
+                //playPause.setImageResource(R.drawable.ic_pause_black_24dp);
                 keepplaying = false;
                 serviceIntent.setAction(MusicService.PLAY);
                 startService(serviceIntent);
@@ -217,7 +255,7 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case 1:
                 playing = 0;
-                playPause.setImageResource(R.drawable.ic_play_arrow_black_24dp);
+                //playPause.setImageResource(R.drawable.ic_play_arrow_black_24dp);
                 keepplaying = false;
                 serviceIntent.setAction(MusicService.PAUSE);
                 startService(serviceIntent);
@@ -226,7 +264,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void GoToPrevious(View view){
+//    public void GoToPrevious(View view){
+    public void GoToPrevious(){
         switch (MusicService.queue){
             case 1:
                 if(MusicService.mPlayPosition != 0)
@@ -247,11 +286,12 @@ public class MainActivity extends AppCompatActivity {
 
         keepplaying = true;
         musicProgress.setProgress(0);
-        PlayPause(playPause);
+        PlayPause();
         showSongTitle(MusicService.mPlayPosition);
     }
 
-    public void GoToNext(View view){
+    //public void GoToNext(View view){
+    public void GoToNext(){
         switch (MusicService.queue){
             case 1:
                 if(MusicService.mPlayPosition != songsAdapter.getCount() - 1)
@@ -271,7 +311,7 @@ public class MainActivity extends AppCompatActivity {
         }
         keepplaying = true;
         musicProgress.setProgress(0);
-        PlayPause(playPause);
+        PlayPause();
         showSongTitle(MusicService.mPlayPosition);
     }
 
@@ -353,5 +393,93 @@ public class MainActivity extends AppCompatActivity {
 
         Notification n = notification.build();
         nm.notify(555, n);
+    }
+
+    @Override
+    public boolean onDown(MotionEvent e) {
+        return false;
+    }
+
+    @Override
+    public void onShowPress(MotionEvent e) {
+        Log.d("A_R_T", "onShowPress");
+    }
+
+    @Override
+    public boolean onSingleTapUp(MotionEvent e) {
+        Log.d("A_R_T", "onSingleTapUp");
+        PlayPause();
+        return false;
+    }
+
+    @Override
+    public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+        return false;
+    }
+
+
+    PopupWindow popup;
+    LayoutInflater layoutInflater;
+
+    @Override
+    public void onLongPress(MotionEvent e) { //show Drake
+        Log.d("A_R_T", "onLongPress");
+        layoutInflater = (LayoutInflater) getSystemService(LAYOUT_INFLATER_SERVICE);
+        ViewGroup container = (ViewGroup) layoutInflater.inflate(R.layout.drake, null);
+
+        popup = new PopupWindow(container, 900, 550, true);
+        popup.showAtLocation(relativeLayout, Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL, 0, 0);
+
+        new Handler().postDelayed(new Runnable(){
+            public void run() {
+                if (popup != null) {
+                    popup.dismiss();
+                    popup = null;
+                }
+            }}, 2 *1000);
+    }
+
+    @Override
+    public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+        if(e1.getX() < e2.getX() && e2.getX()-e1.getX() > Math.abs(e1.getY() - e2.getY())){
+            Log.d("A_R_T", "Right");
+            GoToPrevious();
+        }
+        else if (e1.getX() > e2.getX() && e1.getX()-e2.getX() > Math.abs(e1.getY() - e2.getY())){
+            Log.d("A_R_T", "Left");
+            GoToNext();
+        }
+        else if (e1.getY() > e2.getY() && e1.getY()-e2.getY() > Math.abs(e1.getX() - e2.getX())){
+            Log.d("A_R_T", "Top");
+            ChangePlayQueue();
+        }
+        else if (e1.getY() < e2.getY() && e2.getY()-e1.getY() > Math.abs(e1.getX() - e2.getX())){
+            Log.d("A_R_T", "Bottom");
+            ChangePlayQueueReverse();
+        }
+        return false;
+    }
+
+
+    @Override
+    public boolean onSingleTapConfirmed(MotionEvent e) {
+        return false;
+    }
+
+    @Override
+    public boolean onDoubleTap(MotionEvent e) {
+        return false;
+    }
+
+    @Override
+    public boolean onDoubleTapEvent(MotionEvent e) {
+        Log.d("A_R_T", "onDoubleTapEvent");
+        return false;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        gestureDetector.onTouchEvent(event);
+        return super.onTouchEvent(event);
     }
 }
